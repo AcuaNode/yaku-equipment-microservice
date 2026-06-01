@@ -8,8 +8,8 @@
 ## Runtime Dependencies
 - **PostgreSQL** is required for local development.
   - `docker compose up -d` spins up `postgres:latest` on port `5432` with DB `yaku_equipment`.
-  - `compose.yaml` lives at repo root.
-- **Kafka** is required if you need to verify event publishing locally. The bootstrap server is configured in `application-dev.properties` (`localhost:9092`).
+  - `compose.yaml` lives at repo root and includes **Kafka in KRaft mode** (no Zookeeper) on port `9092`.
+- **Kafka** is configured for event publishing. The bootstrap server is `localhost:9092` (configured in `application-dev.properties`).
 - There is no MQTT or Spring Integration configuration in this service.
 
 ## Architecture
@@ -29,12 +29,14 @@
 
 ## Testing
 - **Unit tests** are plain JUnit 5; domain aggregate tests live in `src/test/java/.../domain/model/aggregates/`.
+- **Service layer unit tests** cover ownership validation: `FarmCommandServiceImplTest` and `PondCommandServiceImplTest` under `application/internal/commandservices/`.
 - **Integration tests** override the datasource to an **H2** in-memory DB and disable SQL initialization (`spring.sql.init.mode=never`). If you add new Spring Boot tests that load the full context, copy the `@TestPropertySource` pattern from existing integration tests.
-- Cucumber `.feature` files exist under `src/test/resources/features/equipment/` but there is **no Java runner wired up yet**; they are currently inactive.
+- **No BDD/Cucumber tests** — feature files were removed during extraction (inactive and out-of-scope).
 
 ## Security & API
 - **No JWT or Spring Security** inside this service. Authentication is handled upstream by the API Gateway.
 - User identity is injected via the `X-User-Id` HTTP header. Controllers accept it with `@RequestHeader("X-User-Id") Long ownerId`.
+- **Equipment ownership**: `EquipmentController` does **not** receive `X-User-Id`. Equipment is scoped by `pondId`/`farmId`. The API Gateway must always include `farmId` or `pondId` query params when calling `GET /api/v1/equipment`. Without query params, this endpoint returns **all equipment** (no owner filtering).
 - OpenAPI/Swagger UI is available at `/swagger-ui/index.html` when the app is running.
 - API base path for controllers is `/api/v1/*`.
 
