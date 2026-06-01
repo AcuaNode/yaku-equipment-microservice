@@ -8,7 +8,6 @@ import io.github.rafaviv.yakubackend.equipment.interfaces.rest.resources.CreateF
 import io.github.rafaviv.yakubackend.equipment.interfaces.rest.resources.FarmResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,16 +26,11 @@ public class FarmController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<FarmResource> createFarm(@RequestBody CreateFarmResource resource, org.springframework.security.core.Authentication authentication) {
-        io.github.rafaviv.yakubackend.iam.infrastructure.authorization.sfs.model.UserDetailsImpl userDetails = 
-            (io.github.rafaviv.yakubackend.iam.infrastructure.authorization.sfs.model.UserDetailsImpl) authentication.getPrincipal();
-        Long adminId = userDetails.getId();
-        
-        CreateFarmCommand command = new CreateFarmCommand(resource.name(), adminId, resource.address());
+    public ResponseEntity<FarmResource> createFarm(@RequestBody CreateFarmResource resource, @RequestHeader("X-User-Id") Long ownerId) {
+        CreateFarmCommand command = new CreateFarmCommand(resource.name(), ownerId, resource.address());
         var farm = farmCommandService.handle(command);
         if (farm.isEmpty()) return ResponseEntity.badRequest().build();
-        
+
         var createdFarm = farm.get();
         var farmResource = new FarmResource(createdFarm.getId(), createdFarm.getName(), createdFarm.getOwnerId(), createdFarm.getAddress(), createdFarm.getFarmToken());
 
@@ -44,26 +38,18 @@ public class FarmController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteFarm(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteFarm(@PathVariable Long id, @RequestHeader("X-User-Id") Long ownerId) {
         try {
-            farmCommandService.deleteFarm(id);
+            farmCommandService.deleteFarm(id, ownerId);
             return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
-
-
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<FarmResource>> getAllFarmsByOwner(org.springframework.security.core.Authentication authentication) {
-        io.github.rafaviv.yakubackend.iam.infrastructure.authorization.sfs.model.UserDetailsImpl userDetails = 
-            (io.github.rafaviv.yakubackend.iam.infrastructure.authorization.sfs.model.UserDetailsImpl) authentication.getPrincipal();
-        Long adminId = userDetails.getId();
-        
-        var query = new GetFarmsByOwnerIdQuery(adminId);
+    public ResponseEntity<List<FarmResource>> getAllFarmsByOwner(@RequestHeader("X-User-Id") Long ownerId) {
+        var query = new GetFarmsByOwnerIdQuery(ownerId);
         var farms = farmQueryService.handle(query);
         var resources = farms.stream()
                 .map(farm -> new FarmResource(farm.getId(), farm.getName(), farm.getOwnerId(), farm.getAddress(), farm.getFarmToken()))
@@ -72,11 +58,14 @@ public class FarmController {
     }
 
     @PatchMapping("/{id}/token")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<FarmResource> regenerateToken(@PathVariable Long id) {
-        return farmCommandService.regenerateToken(id)
-                .map(farm -> ResponseEntity.ok(new FarmResource(farm.getId(), farm.getName(), farm.getOwnerId(), farm.getAddress(), farm.getFarmToken())))
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<FarmResource> regenerateToken(@PathVariable Long id, @RequestHeader("X-User-Id") Long ownerId) {
+        try {
+            return farmCommandService.regenerateToken(id, ownerId)
+                    .map(farm -> ResponseEntity.ok(new FarmResource(farm.getId(), farm.getName(), farm.getOwnerId(), farm.getAddress(), farm.getFarmToken())))
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
 }

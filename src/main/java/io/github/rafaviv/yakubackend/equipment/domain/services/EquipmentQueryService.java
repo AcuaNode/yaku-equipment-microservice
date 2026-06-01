@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface EquipmentQueryService {
     List<Equipment> getAllEquipment();
+    List<Equipment> getByPondId(Long pondId);
+    List<Equipment> getByFarmId(Long farmId);
 }

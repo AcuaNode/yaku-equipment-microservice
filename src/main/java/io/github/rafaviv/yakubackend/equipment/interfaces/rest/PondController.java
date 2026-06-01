@@ -2,6 +2,7 @@ package io.github.rafaviv.yakubackend.equipment.interfaces.rest;
 
 import io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetAllPondsQuery;
 import io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetPondByIdQuery;
+import io.github.rafaviv.yakubackend.equipment.domain.services.FarmQueryService;
 import io.github.rafaviv.yakubackend.equipment.domain.services.PondCommandService;
 import io.github.rafaviv.yakubackend.equipment.domain.services.PondQueryService;
 import io.github.rafaviv.yakubackend.equipment.interfaces.rest.resources.PondResource;
@@ -10,7 +11,6 @@ import io.github.rafaviv.yakubackend.equipment.interfaces.rest.transform.PondRes
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,16 +22,17 @@ public class PondController {
 
     private final PondCommandService pondCommandService;
     private final PondQueryService pondQueryService;
+    private final FarmQueryService farmQueryService;
 
-    public PondController(PondCommandService pondCommandService, PondQueryService pondQueryService) {
+    public PondController(PondCommandService pondCommandService, PondQueryService pondQueryService, FarmQueryService farmQueryService) {
         this.pondCommandService = pondCommandService;
         this.pondQueryService = pondQueryService;
+        this.farmQueryService = farmQueryService;
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PondResource> createPond(@RequestBody CreatePondResource resource) {
-        var pond = pondCommandService.createPond(resource.farmId(), resource.name(), resource.species(), resource.volume());
+    public ResponseEntity<PondResource> createPond(@RequestBody CreatePondResource resource, @RequestHeader("X-User-Id") Long ownerId) {
+        var pond = pondCommandService.createPond(resource.farmId(), resource.name(), resource.species(), resource.volume(), ownerId);
         if (pond.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
@@ -40,7 +41,6 @@ public class PondController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('OPERATOR')")
     public ResponseEntity<List<PondResource>> getAllPonds() {
         var query = new GetAllPondsQuery();
         var ponds = pondQueryService.handle(query);
@@ -51,7 +51,6 @@ public class PondController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('OPERATOR')")
     public ResponseEntity<PondResource> getPondById(@PathVariable Long id) {
         var query = new GetPondByIdQuery(id);
         var pond = pondQueryService.handle(query);
@@ -63,10 +62,9 @@ public class PondController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deletePond(@PathVariable Long id) {
+    public ResponseEntity<Void> deletePond(@PathVariable Long id, @RequestHeader("X-User-Id") Long ownerId) {
         try {
-            pondCommandService.deletePond(id);
+            pondCommandService.deletePond(id, ownerId);
             return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -74,8 +72,12 @@ public class PondController {
     }
 
     @GetMapping("/farm/{farmId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('OPERATOR')")
-    public ResponseEntity<List<PondResource>> getPondsByFarmId(@PathVariable Long farmId) {
+    public ResponseEntity<List<PondResource>> getPondsByFarmId(@PathVariable Long farmId, @RequestHeader("X-User-Id") Long ownerId) {
+        var farm = farmQueryService.handle(new io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetFarmsByOwnerIdQuery(ownerId))
+                .stream().filter(f -> f.getId().equals(farmId)).findFirst();
+        if (farm.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
         var query = new io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetPondsByFarmIdQuery(farmId);
         var ponds = pondQueryService.handle(query);
         var resources = ponds.stream()
@@ -85,9 +87,8 @@ public class PondController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PondResource> updatePond(@PathVariable Long id, @RequestBody CreatePondResource resource) {
-        return pondCommandService.updatePond(id, resource.name(), resource.species(), resource.volume())
+    public ResponseEntity<PondResource> updatePond(@PathVariable Long id, @RequestBody CreatePondResource resource, @RequestHeader("X-User-Id") Long ownerId) {
+        return pondCommandService.updatePond(id, resource.name(), resource.species(), resource.volume(), ownerId)
                 .map(pond -> ResponseEntity.ok(PondResourceFromEntityAssembler.toResourceFromEntity(pond)))
                 .orElse(ResponseEntity.notFound().build());
     }

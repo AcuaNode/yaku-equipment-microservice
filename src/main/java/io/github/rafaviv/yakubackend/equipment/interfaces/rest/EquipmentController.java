@@ -42,7 +42,15 @@ public class EquipmentController {
     }
 
     @GetMapping
-    public ResponseEntity<java.util.List<io.github.rafaviv.yakubackend.equipment.domain.model.aggregates.Equipment>> getAllEquipment() {
+    public ResponseEntity<java.util.List<io.github.rafaviv.yakubackend.equipment.domain.model.aggregates.Equipment>> getAllEquipment(
+            @RequestParam(required = false) Long pondId,
+            @RequestParam(required = false) Long farmId) {
+        if (pondId != null) {
+            return ResponseEntity.ok(equipmentQueryService.getByPondId(pondId));
+        }
+        if (farmId != null) {
+            return ResponseEntity.ok(equipmentQueryService.getByFarmId(farmId));
+        }
         return ResponseEntity.ok(equipmentQueryService.getAllEquipment());
     }
 

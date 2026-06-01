@@ -20,4 +20,14 @@ public class EquipmentQueryServiceImpl implements EquipmentQueryService {
     public List<Equipment> getAllEquipment() {
         return equipmentRepository.findAll();
     }
+
+    @Override
+    public List<Equipment> getByPondId(Long pondId) {
+        return equipmentRepository.findByPondId(pondId);
+    }
+
+    @Override
+    public List<Equipment> getByFarmId(Long farmId) {
+        return equipmentRepository.findByFarmId(farmId);
+    }
 }
