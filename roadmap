@@ -1,0 +1,140 @@
+# ROADMAP — Extracción del Microservicio equipment-service
+
+## Rol del Agente
+Eres un Ingeniero de Software Senior experto en Java 17+, Spring Boot 3.x, Domain-Driven Design (DDD), CQRS, Clean Architecture y refactorización de Monolitos a Microservicios. Tu objetivo es guiar paso a paso y generar código seguro para extraer el Bounded Context de `equipment` del monolito YakuControl.
+
+## Contexto del Proyecto: YakuControl (Acuicultura IoT)
+El bounded context de `equipment` gestiona la infraestructura física de las piscigranjas:
+- **Farm** (Granja/Empresa): Representa a la empresa dueña de las pozas. Asociada a un `ownerId` (propietario).
+- **Pond** (Poza de crianza): Pertenece a una Farm. Tiene un estado (`PondStatus`).
+- **Equipment** (Dispositivos/Sensores): Equipamiento IoT (sensores de oxígeno, temperatura, etc.) vinculados físicamente a un Pond.
+
+## Estructura de Paquetes en el Monolito (Origen)
+El código de origen se encuentra estructurado bajo patrones rigurosos de Clean Architecture y CQRS:
+- `domain/model/aggregates/` — Entidades raíz (`Farm`, `Pond`, `Equipment`).
+- `domain/model/valueobjects/` — Objetos de valor (`PondStatus`, `EquipmentStatus`, `EquipmentType`).
+- `domain/model/commands/` y `queries/` — Patrón CQRS para escrituras y lecturas.
+- `domain/services/` — Interfaces de servicios de dominio.
+- `application/internal/` — Implementaciones de servicios de comandos y consultas.
+- `infrastructure/` — Repositorios JPA y adapters de infraestructura.
+- `interfaces/rest/` — Controladores REST, recursos (DTOs) y ensambladores (`transform`).
+
+---
+
+## FASES DE TRABAJO (Ejecutar paso a paso)
+
+### FASE 1: Aislamiento del Pom y Código
+**Objetivo:** Limpiar dependencias y aislar el paquete `equipment`.
+
+1. **Eliminar bounded contexts ajenos:**
+   - Borra completamente los directorios de origen:
+     - `src/main/java/io/github/rafaviv/yakubackend/iam/`
+     - `src/main/java/io/github/rafaviv/yakubackend/telemetry/`
+     - `src/main/java/io/github/rafaviv/yakubackend/subscription/`
+     - `src/main/java/io/github/rafaviv/yakubackend/notification/`
+     - `src/test/java/io/github/rafaviv/yakubackend/iam/`
+     - `src/test/java/io/github/rafaviv/yakubackend/telemetry/`
+     - `src/test/java/io/github/rafaviv/yakubackend/subscription/`
+     - `src/test/java/io/github/rafaviv/yakubackend/notification/`
+     - `src/test/resources/features/iam/`
+     - `src/test/resources/features/telemetry/`
+     - `src/test/resources/features/subscription/`
+     - `src/test/resources/features/notification/`
+   - **Mantén intacto** `io.github.rafaviv.yakubackend.shared` (auditing, naming strategy, exception handling, OpenAPI config).
+
+2. **Actualizar `pom.xml`:**
+   - Cambiar `artifactId` a `equipment-service`.
+   - Eliminar dependencias que solo usaban otros contextos (JWT, Spring Security, Spring Integration MQTT, Spring Modulith, H2, etc.).
+   - Dependencias permitidas: `spring-boot-starter-web`, `spring-boot-starter-data-jpa`, `postgresql`, `lombok`, `spring-boot-starter-validation`, `spring-kafka` (para Fase 4).
+   - Lombok debe seguir explícitamente en `annotationProcessorPaths` del `maven-compiler-plugin`.
+
+3. **Eliminar CI del monolito:**
+   - Borra `.github/workflows/develop_yaku-back.yml` para evitar fallos de build intentando compilar el monolito.
+
+4. **Renombrar clase principal:**
+   - Renombrar `YakuBackendApplication.java` → `EquipmentServiceApplication.java` y actualizar su `@SpringBootApplication`.
+
+5. **Limpieza de recursos:**
+   - Editar `src/main/resources/data.sql` para eliminar seeds de IAM (roles, usuarios) y telemetry (sensor readings, measurement aggregates, threshold configs). Dejar solo seeds relevantes a `equipment` si los hay.
+
+---
+
+### FASE 2: Eliminación de Acoplamiento (Desvincular IAM)
+**Objetivo:** Eliminar toda dependencia con el contexto de autenticación.
+
+1. **En `FarmController.java` (y cualquier otro controller de `equipment`):**
+   - Eliminar imports de:
+     - `org.springframework.security.access.prepost.PreAuthorize`
+     - `org.springframework.security.core.Authentication`
+     - `io.github.rafaviv.yakubackend.iam.infrastructure.authorization.sfs.model.UserDetailsImpl`
+   - Eliminar todas las anotaciones `@PreAuthorize`.
+   - Eliminar el parámetro `Authentication authentication` de los métodos.
+   - Eliminar los casts a `UserDetailsImpl` y la extracción de `adminId` desde el principal.
+   - Reemplazar la obtención del usuario por inyección de cabecera:
+     ```java
+     @RequestHeader("X-User-Id") Long ownerId
+     ```
+   - Usar directamente ese `ownerId` para construir los `Command` y `Query`.
+
+2. **Verificar `CreateFarmCommand` y `Farm.java`:**
+   - Confirmar que ya usan `Long ownerId` (no relación JPA con `User`). Si por algún resto quedó un objeto `User`, reemplazarlo inmediatamente por `Long ownerId`.
+
+---
+
+### FASE 3: Configuración de Base de Datos de Desarrollo
+**Objetivo:** Permitir que el microservicio corra localmente con su propia persistencia.
+
+1. **Crear `src/main/resources/application-dev.properties`:**
+   ```properties
+   spring.datasource.url=jdbc:postgresql://localhost:5432/yaku_equipment
+   spring.datasource.username=root
+   spring.datasource.password=password
+   spring.jpa.hibernate.ddl-auto=update
+   spring.jpa.show-sql=true
+   ```
+
+2. **Crear `compose.yaml` local (reemplazar el actual):**
+   ```yaml
+   services:
+     postgres:
+       image: 'postgres:latest'
+       environment:
+         - 'POSTGRES_DB=yaku_equipment'
+         - 'POSTGRES_PASSWORD=password'
+         - 'POSTGRES_USER=root'
+       ports:
+         - '5432:5432'
+   ```
+   - El contenedor ya no debe crear `mydatabase` ni usar credenciales del monolito.
+
+---
+
+### FASE 4: Publicación de Eventos en Kafka (Consistencia Eventual)
+**Objetivo:** Reemplazar los eventos de Spring en memoria por publicaciones de tópicos en Kafka.
+
+1. **Agregar `spring-kafka` al `pom.xml`.**
+
+2. **Crear configuración Kafka:**
+   - Declarar `KafkaTemplate<String, String>` como bean de producción.
+   - Configurar `application-dev.properties` con `spring.kafka.bootstrap-servers=localhost:9092`.
+
+3. **Reemplazar `SpringDomainEventPublisher`:**
+   - Eliminar o refactorizar `SpringDomainEventPublisher` para que, en lugar de `applicationEventPublisher.publishEvent(event)`, serialice el evento a JSON y lo envíe a Kafka.
+   - **Todos** los eventos del contexto `equipment` deben publicarse en Kafka:
+     - `SensorLinkedToPondEvent` → tópico `pond-events`
+     - `EquipmentRegistrationRequested` → tópico `equipment-events`
+     - `FishFarmerAssignedEvent` → tópico `equipment-events`
+   - Asegurar que el serializador use el `ObjectMapper` ya existente.
+
+4. **Nota de contrato:**
+   - Los consumidores de estos eventos (por ejemplo, `telemetry` y `notification` en sus propios microservicios futuros) escucharán estos tópicos. No es necesario crear listeners aquí.
+
+---
+
+## REGLAS DE GENERACIÓN DE CÓDIGO Y RESTRICCIONES ESTRICTAS
+
+- **Preserva la arquitectura CQRS y DDD:** Mantén la separación estricta de commands, queries, aggregates y value objects. No simplifiques el código destruyendo este diseño.
+- **Nombres de Tablas:** El proyecto utiliza `SnakeCaseWithPluralizedTablePhysicalNamingStrategy`. Las tablas físicas se llaman automáticamente `farms`, `ponds` y `equipments`. Ten esto en cuenta si diseñas consultas SQL nativas.
+- **No uses Browser Alerts:** Todo el feedback de error debe ser devuelto a través del formato estándar de excepciones (`GlobalExceptionHandler` con `ApiErrorResource`), manteniendo la estructura existente en `shared`.
+- **Pensamiento Modular:** Proporciona explicaciones concisas y centradas en el código que se te solicita modificar. No generes bloques masivos de código que no tengan relación con el bounded context de `equipment`.
+- **Compilación en cada fase:** Después de cada fase, ejecuta `./mvnw clean compile` para asegurar que no quedan referencias huérfanas a paquetes eliminados.
