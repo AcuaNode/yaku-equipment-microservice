@@ -14,11 +14,11 @@ import org.springframework.test.context.TestPropertySource;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mqtt.MqttAutoConfiguration,org.springframework.boot.autoconfigure.integration.IntegrationAutoConfiguration",
-        "spring.sql.init.mode=never"
+        "spring.sql.init.mode=never",
+        "spring.kafka.bootstrap-servers=localhost:9092"
     }
 )
-class YakuBackendApplicationTests {
+class EquipmentServiceApplicationTests {
 
     @Test
     void contextLoads() {

@@ -6,10 +6,10 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @SpringBootApplication
 @EnableJpaAuditing
-public class YakuBackendApplication {
+public class EquipmentServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(YakuBackendApplication.class, args);
+        SpringApplication.run(EquipmentServiceApplication.class, args);
     }
 
 }
