@@ -5,6 +5,7 @@ import io.github.rafaviv.yakubackend.equipment.domain.model.events.EquipmentRegi
 import io.github.rafaviv.yakubackend.equipment.domain.model.events.SensorLinkedToPondEvent;
 import io.github.rafaviv.yakubackend.equipment.domain.model.valueobjects.EquipmentType;
 import io.github.rafaviv.yakubackend.equipment.domain.services.EquipmentCommandService;
+import io.github.rafaviv.yakubackend.equipment.infrastructure.events.SpringDomainEventPublisher;
 import io.github.rafaviv.yakubackend.equipment.infrastructure.events.kafka.KafkaDomainEventPublisher;
 import io.github.rafaviv.yakubackend.equipment.infrastructure.persistence.jpa.repositories.EquipmentRepository;
 import io.github.rafaviv.yakubackend.equipment.infrastructure.persistence.jpa.repositories.PondRepository;
@@ -15,30 +16,28 @@ import java.util.Optional;
 @Service
 public class EquipmentCommandServiceImpl implements EquipmentCommandService {
 
-    private static final String EQUIPMENT_EVENTS_TOPIC = "equipment-events";
-    private static final String POND_EVENTS_TOPIC = "pond-events";
-
     private final EquipmentRepository equipmentRepository;
     private final PondRepository pondRepository;
-    private final KafkaDomainEventPublisher eventPublisher;
+    private final SpringDomainEventPublisher eventPublisher;
 
-    public EquipmentCommandServiceImpl(EquipmentRepository equipmentRepository, PondRepository pondRepository, KafkaDomainEventPublisher eventPublisher) {
+    public EquipmentCommandServiceImpl(EquipmentRepository equipmentRepository, PondRepository pondRepository, SpringDomainEventPublisher eventPublisher) {
         this.equipmentRepository = equipmentRepository;
         this.pondRepository = pondRepository;
         this.eventPublisher = eventPublisher;
     }
 
     @Override
-    public Optional<Equipment> registerEquipment(EquipmentType type, String name, String physicalCode) {
-        Equipment equipment = new Equipment(type, name, physicalCode);
+    public Optional<Equipment> registerEquipment(EquipmentType type, String name, String physicalCode, Long farmId) {
+        Equipment equipment = new Equipment(type, name, physicalCode, farmId);
         Equipment savedEquipment = equipmentRepository.save(equipment);
-
+        
         try {
-            eventPublisher.publish(EQUIPMENT_EVENTS_TOPIC, new EquipmentRegistrationRequested(savedEquipment.getId()));
+            eventPublisher.publish(new EquipmentRegistrationRequested(savedEquipment.getId()));
         } catch (Exception e) {
-            throw new RuntimeException("Error publishing equipment registration event", e);
+            // Se asume que si el evento lanza una excepción es porque el plan no lo permite
+            throw new RuntimeException("El plan no permite más agregaciones", e);
         }
-
+        
         return Optional.of(savedEquipment);
     }
 
@@ -48,14 +47,14 @@ public class EquipmentCommandServiceImpl implements EquipmentCommandService {
                 .orElseThrow(() -> new IllegalArgumentException("Equipment not found"));
         var pond = pondRepository.findById(pondId)
                 .orElseThrow(() -> new IllegalArgumentException("Pond not found"));
-
+                
         equipment.linkToPond(pond.getId());
         Equipment savedEquipment = equipmentRepository.save(equipment);
-
+        
         if (savedEquipment.getType() == EquipmentType.SENSOR) {
-            eventPublisher.publish(POND_EVENTS_TOPIC, new SensorLinkedToPondEvent(savedEquipment.getId(), pond.getId()));
+            eventPublisher.publish(new SensorLinkedToPondEvent(savedEquipment.getId(), pond.getId()));
         }
-
+        
         return Optional.of(savedEquipment);
     }
 

@@ -1,6 +1,7 @@
 package io.github.rafaviv.yakubackend.equipment.domain.model.aggregates;
 
 import io.github.rafaviv.yakubackend.equipment.domain.model.valueobjects.PondStatus;
+import io.github.rafaviv.yakubackend.equipment.domain.model.valueobjects.Species;
 import io.github.rafaviv.yakubackend.shared.domain.model.aggregates.AuditableAbstractAggregateRoot;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -20,7 +21,9 @@ public class Pond extends AuditableAbstractAggregateRoot<Pond> {
     @Column(nullable = false)
     private String name;
 
-    private String species;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Species species;
 
     @Column(nullable = false)
     private Double volume;
@@ -29,11 +32,14 @@ public class Pond extends AuditableAbstractAggregateRoot<Pond> {
     @Column(nullable = false)
     private PondStatus status;
 
+    @Column
+    private Long assignedOperatorId;
+
     public Pond() {
         // JPA requires a default constructor
     }
 
-    public Pond(Long farmId, String name, String species, Double volume) {
+    public Pond(Long farmId, String name, Species species, Double volume) {
         this.farmId = farmId;
         this.name = name;
         this.species = species;
@@ -45,9 +51,17 @@ public class Pond extends AuditableAbstractAggregateRoot<Pond> {
         this.status = status;
     }
 
-    public void update(String name, String species, Double volume) {
+    public void update(String name, Species species, Double volume) {
         if (name != null && !name.isBlank()) this.name = name;
         if (species != null) this.species = species;
         if (volume != null && volume > 0) this.volume = volume;
+    }
+
+    public void assignOperator(Long operatorId) {
+        this.assignedOperatorId = operatorId;
+    }
+
+    public void deassignOperator() {
+        this.assignedOperatorId = null;
     }
 }

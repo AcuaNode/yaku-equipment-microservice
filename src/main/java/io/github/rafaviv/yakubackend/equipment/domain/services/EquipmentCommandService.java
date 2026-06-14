@@ -6,7 +6,7 @@ import io.github.rafaviv.yakubackend.equipment.domain.model.valueobjects.Equipme
 import java.util.Optional;
 
 public interface EquipmentCommandService {
-    Optional<Equipment> registerEquipment(EquipmentType type, String name, String physicalCode);
+    Optional<Equipment> registerEquipment(EquipmentType type, String name, String physicalCode, Long farmId);
     Optional<Equipment> linkEquipmentToPond(Long equipmentId, Long pondId);
     void deleteEquipment(Long equipmentId);
 }

@@ -2,6 +2,8 @@ package io.github.rafaviv.yakubackend.equipment.interfaces.rest;
 
 import io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetAllPondsQuery;
 import io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetPondByIdQuery;
+import io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetPondsByAssignedOperatorIdQuery;
+import io.github.rafaviv.yakubackend.equipment.domain.model.valueobjects.Species;
 import io.github.rafaviv.yakubackend.equipment.domain.services.FarmQueryService;
 import io.github.rafaviv.yakubackend.equipment.domain.services.PondCommandService;
 import io.github.rafaviv.yakubackend.equipment.domain.services.PondQueryService;
@@ -11,9 +13,11 @@ import io.github.rafaviv.yakubackend.equipment.interfaces.rest.transform.PondRes
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -22,17 +26,16 @@ public class PondController {
 
     private final PondCommandService pondCommandService;
     private final PondQueryService pondQueryService;
-    private final FarmQueryService farmQueryService;
 
-    public PondController(PondCommandService pondCommandService, PondQueryService pondQueryService, FarmQueryService farmQueryService) {
+    public PondController(PondCommandService pondCommandService, PondQueryService pondQueryService) {
         this.pondCommandService = pondCommandService;
         this.pondQueryService = pondQueryService;
-        this.farmQueryService = farmQueryService;
     }
 
     @PostMapping
-    public ResponseEntity<PondResource> createPond(@RequestBody CreatePondResource resource, @RequestHeader("X-User-Id") Long ownerId) {
-        var pond = pondCommandService.createPond(resource.farmId(), resource.name(), resource.species(), resource.volume(), ownerId);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PondResource> createPond(@RequestBody CreatePondResource resource) {
+        var pond = pondCommandService.createPond(resource.farmId(), resource.name(), Species.valueOf(resource.species()), resource.volume());
         if (pond.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
@@ -41,6 +44,7 @@ public class PondController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OPERATOR')")
     public ResponseEntity<List<PondResource>> getAllPonds() {
         var query = new GetAllPondsQuery();
         var ponds = pondQueryService.handle(query);
@@ -51,6 +55,7 @@ public class PondController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OPERATOR')")
     public ResponseEntity<PondResource> getPondById(@PathVariable Long id) {
         var query = new GetPondByIdQuery(id);
         var pond = pondQueryService.handle(query);
@@ -62,22 +67,30 @@ public class PondController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletePond(@PathVariable Long id, @RequestHeader("X-User-Id") Long ownerId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deletePond(@PathVariable Long id) {
         try {
-            pondCommandService.deletePond(id, ownerId);
+            pondCommandService.deletePond(id);
             return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
     }
 
+    @GetMapping("/operator/{operatorId}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OPERATOR')")
+    public ResponseEntity<List<PondResource>> getPondsByOperatorId(@PathVariable Long operatorId) {
+        var query = new GetPondsByAssignedOperatorIdQuery(operatorId);
+        var ponds = pondQueryService.handle(query);
+        var resources = ponds.stream()
+                .map(PondResourceFromEntityAssembler::toResourceFromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(resources);
+    }
+
     @GetMapping("/farm/{farmId}")
-    public ResponseEntity<List<PondResource>> getPondsByFarmId(@PathVariable Long farmId, @RequestHeader("X-User-Id") Long ownerId) {
-        var farm = farmQueryService.handle(new io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetFarmsByOwnerIdQuery(ownerId))
-                .stream().filter(f -> f.getId().equals(farmId)).findFirst();
-        if (farm.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
+    @PreAuthorize("hasRole('ADMIN') or hasRole('OPERATOR')")
+    public ResponseEntity<List<PondResource>> getPondsByFarmId(@PathVariable Long farmId) {
         var query = new io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetPondsByFarmIdQuery(farmId);
         var ponds = pondQueryService.handle(query);
         var resources = ponds.stream()
@@ -87,8 +100,27 @@ public class PondController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<PondResource> updatePond(@PathVariable Long id, @RequestBody CreatePondResource resource, @RequestHeader("X-User-Id") Long ownerId) {
-        return pondCommandService.updatePond(id, resource.name(), resource.species(), resource.volume(), ownerId)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PondResource> updatePond(@PathVariable Long id, @RequestBody CreatePondResource resource) {
+        return pondCommandService.updatePond(id, resource.name(), Species.valueOf(resource.species()), resource.volume())
+                .map(pond -> ResponseEntity.ok(PondResourceFromEntityAssembler.toResourceFromEntity(pond)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{pondId}/assignments")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PondResource> assignOperator(@PathVariable Long pondId, @RequestBody Map<String, Long> body) {
+        Long operatorId = body.get("operatorId");
+        if (operatorId == null) return ResponseEntity.badRequest().build();
+        return pondCommandService.assignOperator(pondId, operatorId)
+                .map(pond -> ResponseEntity.ok(PondResourceFromEntityAssembler.toResourceFromEntity(pond)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{pondId}/deassignments/{operatorId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PondResource> deassignOperator(@PathVariable Long pondId, @PathVariable Long operatorId) {
+        return pondCommandService.deassignOperator(pondId)
                 .map(pond -> ResponseEntity.ok(PondResourceFromEntityAssembler.toResourceFromEntity(pond)))
                 .orElse(ResponseEntity.notFound().build());
     }

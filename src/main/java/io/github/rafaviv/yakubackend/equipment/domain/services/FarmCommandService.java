@@ -7,6 +7,6 @@ import java.util.Optional;
 
 public interface FarmCommandService {
     Optional<Farm> handle(CreateFarmCommand command);
-    void deleteFarm(Long farmId, Long ownerId);
-    Optional<Farm> regenerateToken(Long farmId, Long ownerId);
+    void deleteFarm(Long farmId);
+    Optional<Farm> regenerateToken(Long farmId);
 }

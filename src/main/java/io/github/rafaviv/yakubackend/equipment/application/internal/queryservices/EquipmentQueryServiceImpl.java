@@ -1,11 +1,14 @@
 package io.github.rafaviv.yakubackend.equipment.application.internal.queryservices;
 
 import io.github.rafaviv.yakubackend.equipment.domain.model.aggregates.Equipment;
+import io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetEquipmentByFarmIdQuery;
+import io.github.rafaviv.yakubackend.equipment.domain.model.queries.GetEquipmentByIdQuery;
 import io.github.rafaviv.yakubackend.equipment.domain.services.EquipmentQueryService;
 import io.github.rafaviv.yakubackend.equipment.infrastructure.persistence.jpa.repositories.EquipmentRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class EquipmentQueryServiceImpl implements EquipmentQueryService {
@@ -22,12 +25,12 @@ public class EquipmentQueryServiceImpl implements EquipmentQueryService {
     }
 
     @Override
-    public List<Equipment> getByPondId(Long pondId) {
-        return equipmentRepository.findByPondId(pondId);
+    public Optional<Equipment> handle(GetEquipmentByIdQuery query) {
+        return equipmentRepository.findById(query.id());
     }
 
     @Override
-    public List<Equipment> getByFarmId(Long farmId) {
-        return equipmentRepository.findByFarmId(farmId);
+    public List<Equipment> handle(GetEquipmentByFarmIdQuery query) {
+        return equipmentRepository.findByFarmId(query.farmId());
     }
 }

@@ -12,8 +12,6 @@ import java.util.List;
 @Repository
 public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
     List<Equipment> findByPondId(Long pondId);
+    List<Equipment> findByFarmId(Long farmId);
     List<Equipment> findByStatus(EquipmentStatus status);
-
-    @Query("SELECT e FROM Equipment e WHERE e.pondId IN (SELECT p.id FROM Pond p WHERE p.farmId = :farmId)")
-    List<Equipment> findByFarmId(@Param("farmId") Long farmId);
 }

@@ -17,6 +17,8 @@ public class Equipment extends AuditableAbstractAggregateRoot<Equipment> {
 
     private Long pondId;
 
+    private Long farmId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EquipmentType type;
@@ -37,11 +39,12 @@ public class Equipment extends AuditableAbstractAggregateRoot<Equipment> {
     public Equipment() {
     }
 
-    public Equipment(EquipmentType type, String name, String physicalCode) {
+    public Equipment(EquipmentType type, String name, String physicalCode, Long farmId) {
         this.type = type;
         this.status = EquipmentStatus.AVAILABLE;
         this.name = name;
         this.physicalCode = physicalCode;
+        this.farmId = farmId;
     }
 
     public void linkToPond(Long pondId) {
