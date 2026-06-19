@@ -37,7 +37,7 @@ class FarmCommandServiceImplTest {
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
         doNothing().when(farmRepository).deleteById(10L);
 
-        assertDoesNotThrow(() -> farmCommandService.deleteFarm(10L, 1L));
+        assertDoesNotThrow(() -> farmCommandService.deleteFarm(10L));
         verify(farmRepository).deleteById(10L);
     }
 
@@ -47,7 +47,7 @@ class FarmCommandServiceImplTest {
         when(farmRepository.findById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> farmCommandService.deleteFarm(99L, 1L));
+                () -> farmCommandService.deleteFarm(99L));
         assertEquals("Farm not found with id: 99", ex.getMessage());
         verify(farmRepository, never()).deleteById(any());
     }
@@ -59,7 +59,7 @@ class FarmCommandServiceImplTest {
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> farmCommandService.deleteFarm(10L, 1L));
+                () -> farmCommandService.deleteFarm(10L));
         assertEquals("Farm not found with id: 10", ex.getMessage());
         verify(farmRepository, never()).deleteById(any());
     }
@@ -72,7 +72,7 @@ class FarmCommandServiceImplTest {
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
         when(farmRepository.save(any(Farm.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Optional<Farm> result = farmCommandService.regenerateToken(10L, 1L);
+        Optional<Farm> result = farmCommandService.regenerateToken(10L);
 
         assertTrue(result.isPresent());
         assertNotEquals(originalToken, result.get().getFarmToken());
@@ -84,7 +84,7 @@ class FarmCommandServiceImplTest {
         when(farmRepository.findById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> farmCommandService.regenerateToken(99L, 1L));
+                () -> farmCommandService.regenerateToken(99L));
         assertEquals("Farm not found with id: 99", ex.getMessage());
         verify(farmRepository, never()).save(any());
     }
@@ -96,7 +96,7 @@ class FarmCommandServiceImplTest {
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> farmCommandService.regenerateToken(10L, 1L));
+                () -> farmCommandService.regenerateToken(10L));
         assertEquals("Farm not found with id: 10", ex.getMessage());
         verify(farmRepository, never()).save(any());
     }

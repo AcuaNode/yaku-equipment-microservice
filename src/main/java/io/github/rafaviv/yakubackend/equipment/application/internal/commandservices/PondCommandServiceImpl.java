@@ -1,10 +1,8 @@
 package io.github.rafaviv.yakubackend.equipment.application.internal.commandservices;
 
-import io.github.rafaviv.yakubackend.equipment.domain.model.aggregates.Farm;
 import io.github.rafaviv.yakubackend.equipment.domain.model.aggregates.Pond;
 import io.github.rafaviv.yakubackend.equipment.domain.model.valueobjects.Species;
 import io.github.rafaviv.yakubackend.equipment.domain.services.PondCommandService;
-import io.github.rafaviv.yakubackend.equipment.infrastructure.persistence.jpa.repositories.FarmRepository;
 import io.github.rafaviv.yakubackend.equipment.infrastructure.persistence.jpa.repositories.PondRepository;
 import org.springframework.stereotype.Service;
 

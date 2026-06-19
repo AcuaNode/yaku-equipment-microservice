@@ -16,7 +16,7 @@ class PondTest {
         String species = "Tilapia";
         Double volume = 1000.0;
 
-        Pond pond = new Pond(farmId, name, species, volume);
+        Pond pond = new Pond();
 
         assertEquals(farmId, pond.getFarmId());
         assertEquals(name, pond.getName());
@@ -28,7 +28,7 @@ class PondTest {
     @Test
     @DisplayName("Given active pond, When updating status, Then status changes")
     void updateStatus_Successfully() {
-        Pond pond = new Pond(1L, "Pond A", "Tilapia", 1000.0);
+        Pond pond = new Pond();
 
         pond.updateStatus(PondStatus.FULL);
 
@@ -38,7 +38,7 @@ class PondTest {
     @Test
     @DisplayName("Given pond, When updating to all statuses, Then status changes correctly")
     void updateStatus_AllStatuses_Work() {
-        Pond pond = new Pond(1L, "Pond A", "Tilapia", 1000.0);
+        Pond pond = new Pond();
 
         pond.updateStatus(PondStatus.ACTIVE);
         assertEquals(PondStatus.ACTIVE, pond.getStatus());

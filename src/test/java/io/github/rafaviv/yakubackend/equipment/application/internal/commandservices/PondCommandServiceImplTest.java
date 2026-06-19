@@ -2,6 +2,7 @@ package io.github.rafaviv.yakubackend.equipment.application.internal.commandserv
 
 import io.github.rafaviv.yakubackend.equipment.domain.model.aggregates.Farm;
 import io.github.rafaviv.yakubackend.equipment.domain.model.aggregates.Pond;
+import io.github.rafaviv.yakubackend.equipment.domain.model.valueobjects.Species;
 import io.github.rafaviv.yakubackend.equipment.domain.services.PondCommandService;
 import io.github.rafaviv.yakubackend.equipment.infrastructure.persistence.jpa.repositories.FarmRepository;
 import io.github.rafaviv.yakubackend.equipment.infrastructure.persistence.jpa.repositories.PondRepository;
@@ -31,7 +32,7 @@ class PondCommandServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        pondCommandService = new PondCommandServiceImpl(pondRepository, farmRepository);
+        pondCommandService = new PondCommandServiceImpl(pondRepository);
     }
 
     @Test
@@ -44,7 +45,7 @@ class PondCommandServiceImplTest {
             return p;
         });
 
-        Optional<Pond> result = pondCommandService.createPond(10L, "New Pond", "Tilapia", 100.0, 1L);
+        Optional<Pond> result = pondCommandService.createPond(10L, "New Pond", Species.TILAPIA, 100.0);
 
         assertTrue(result.isPresent());
         assertEquals("New Pond", result.get().getName());
@@ -58,7 +59,7 @@ class PondCommandServiceImplTest {
         when(farmRepository.findById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pondCommandService.createPond(99L, "New Pond", "Tilapia", 100.0, 1L));
+                () -> pondCommandService.createPond(99L, "New Pond",Species.TILAPIA, 100.0));
         assertEquals("Farm not found with id: 99", ex.getMessage());
         verify(pondRepository, never()).save(any());
     }
@@ -70,7 +71,7 @@ class PondCommandServiceImplTest {
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pondCommandService.createPond(10L, "New Pond", "Tilapia", 100.0, 1L));
+                () -> pondCommandService.createPond(10L, "New Pond", Species.TILAPIA, 100.0));
         assertEquals("Farm not found with id: 10", ex.getMessage());
         verify(pondRepository, never()).save(any());
     }
@@ -79,12 +80,12 @@ class PondCommandServiceImplTest {
     @DisplayName("Given pond exists and farm belongs to owner, When deletePond, Then deletes successfully")
     void deletePond_OwnerMatches_Deletes() {
         Farm farm = new Farm("Test Farm", 1L, "Address");
-        Pond pond = new Pond(10L, "Test Pond", "Tilapia", 100.0);
+        Pond pond = new Pond(10L, "Test Pond", Species.TILAPIA, 100.0);
         when(pondRepository.findById(5L)).thenReturn(Optional.of(pond));
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
         doNothing().when(pondRepository).deleteById(5L);
 
-        assertDoesNotThrow(() -> pondCommandService.deletePond(5L, 1L));
+        assertDoesNotThrow(() -> pondCommandService.deletePond(5L));
         verify(pondRepository).deleteById(5L);
     }
 
@@ -94,7 +95,7 @@ class PondCommandServiceImplTest {
         when(pondRepository.findById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pondCommandService.deletePond(99L, 1L));
+                () -> pondCommandService.deletePond(99L));
         assertEquals("Pond not found with id: 99", ex.getMessage());
         verify(pondRepository, never()).deleteById(any());
     }
@@ -103,12 +104,12 @@ class PondCommandServiceImplTest {
     @DisplayName("Given pond's farm belongs to different owner, When deletePond, Then throws IllegalArgumentException")
     void deletePond_OwnerMismatch_Throws() {
         Farm farm = new Farm("Test Farm", 2L, "Address");
-        Pond pond = new Pond(10L, "Test Pond", "Tilapia", 100.0);
+        Pond pond = new Pond(10L, "Test Pond", Species.TILAPIA, 100.0);
         when(pondRepository.findById(5L)).thenReturn(Optional.of(pond));
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pondCommandService.deletePond(5L, 1L));
+                () -> pondCommandService.deletePond(5L));
         assertEquals("Pond not found with id: 5", ex.getMessage());
         verify(pondRepository, never()).deleteById(any());
     }
@@ -117,12 +118,12 @@ class PondCommandServiceImplTest {
     @DisplayName("Given pond exists and farm belongs to owner, When updatePond, Then updates successfully")
     void updatePond_OwnerMatches_Updates() {
         Farm farm = new Farm("Test Farm", 1L, "Address");
-        Pond pond = new Pond(10L, "Old Name", "Old Species", 50.0);
+        Pond pond = new Pond(10L, "Old Name", Species.PAICHE, 50.0);
         when(pondRepository.findById(5L)).thenReturn(Optional.of(pond));
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
         when(pondRepository.save(any(Pond.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Optional<Pond> result = pondCommandService.updatePond(5L, "New Name", "New Species", 75.0, 1L);
+        Optional<Pond> result = pondCommandService.updatePond(5L, "New Name", Species.TRUCHA, 75.0);
 
         assertTrue(result.isPresent());
         assertEquals("New Name", result.get().getName());
@@ -134,12 +135,12 @@ class PondCommandServiceImplTest {
     @DisplayName("Given pond's farm belongs to different owner, When updatePond, Then throws IllegalArgumentException")
     void updatePond_OwnerMismatch_Throws() {
         Farm farm = new Farm("Test Farm", 2L, "Address");
-        Pond pond = new Pond(10L, "Old Name", "Old Species", 50.0);
+        Pond pond = new Pond(10L, "Old Name", Species.PAICHE, 50.0);
         when(pondRepository.findById(5L)).thenReturn(Optional.of(pond));
         when(farmRepository.findById(10L)).thenReturn(Optional.of(farm));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pondCommandService.updatePond(5L, "New Name", "New Species", 75.0, 1L));
+                () -> pondCommandService.updatePond(5L, "New Name", Species.TRUCHA, 75.0));
         assertEquals("Pond not found with id: 5", ex.getMessage());
         verify(pondRepository, never()).save(any());
     }
@@ -150,19 +151,19 @@ class PondCommandServiceImplTest {
         when(pondRepository.findById(99L)).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pondCommandService.updatePond(99L, "New Name", "New Species", 75.0, 1L));
+                () -> pondCommandService.updatePond(99L, "New Name", Species.TRUCHA, 75.0));
         assertEquals("Pond not found with id: 99", ex.getMessage());
     }
 
     @Test
     @DisplayName("Given pond exists but farm not found, When updatePond, Then throws IllegalArgumentException")
     void updatePond_FarmNotFound_Throws() {
-        Pond pond = new Pond(10L, "Old Name", "Old Species", 50.0);
+        Pond pond = new Pond();
         when(pondRepository.findById(5L)).thenReturn(Optional.of(pond));
         when(farmRepository.findById(10L)).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> pondCommandService.updatePond(5L, "New Name", "New Species", 75.0, 1L));
+                () -> pondCommandService.updatePond(5L, "New Name", Species.TRUCHA, 75.0));
         assertEquals("Farm not found with id: 10", ex.getMessage());
     }
 }
